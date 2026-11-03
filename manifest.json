@@ -1,0 +1,9 @@
+{
+  "name": "Global ATC",
+  "short_name": "ATC",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020604",
+  "theme_color": "#00e676",
+  "icons": []
+}

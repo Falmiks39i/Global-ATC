@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Global ATC</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body, html { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #020604; color: #e8f7ee; display: flex; flex-direction: column; user-select: none; }
+  
+  #mapContainer { position: relative; flex-grow: 1; background: #020604; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  
+  .hud { position: absolute; top: 16px; left: 16px; display: flex; gap: 16px; background: rgba(4,13,8,0.85); padding: 10px 18px; border-radius: 8px; border: 1px solid #1b4b2c; font-size: 14px; pointer-events: none; }
+  .hud b { color: #00e676; font-family: monospace; font-size: 16px;}
+  .hud .danger b { color: #ff5252; }
+  .hud .timer b { color: #ffb74d; }
+  
+  .bottom-panel { height: 130px; flex-shrink: 0; background: #091c10; border-top: 2px solid #1b4b2c; display: flex; padding: 12px; gap: 12px; z-index: 10; }
+  
+  .combined-section { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #040d06; border: 1px solid #1b4b2c; border-radius: 6px; padding: 10px 16px; }
+  .info-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .flight-id { color: #00e676; font-weight: 700; font-size: 16px; }
+  .airline-name { color: #e8f7ee; font-weight: 600; font-size: 14px; margin-left: 8px; }
+  .route { color: #8fb8a0; font-size: 14px; }
+  .route b { color: #00e676; }
+  .info-sub { display: flex; justify-content: space-between; font-size: 12px; color: #8fb8a0; margin-bottom: 4px; }
+  .fuel-bar-bg { width: 100%; height: 4px; background: #1b4b2c; border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+  .fuel-bar-fill { height: 100%; background: #00e676; width: 100%; transition: width 0.3s, background-color 0.3s; }
+  
+  .control-row { display: flex; gap: 12px; align-items: center; }
+  .control-label { font-size: 12px; color: #8fb8a0; min-width: 60px; }
+  .speed-btns { display: flex; gap: 6px; flex-grow: 1; }
+  .speed-btns button { flex: 1; padding: 6px; font-size: 12px; }
+  
+  .log-section { flex: 1; display: flex; flex-direction: column; background: #020604; border: 1px solid #1b4b2c; border-radius: 6px; padding: 8px 12px; overflow: hidden; font-family: monospace; font-size: 12px; }
+  .log-header { font-size: 11px; color: #00e676; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1b4b2c; padding-bottom: 4px;}
+  .log-content { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  
+  .action-section { display: flex; flex-direction: column; gap: 8px; justify-content: center; width: 160px; flex-shrink: 0; }
+  
+  button {
+    padding: 10px; border: none; border-radius: 4px;
+    background: #155a2a; color: #e8f7ee;
+    font-weight: 600; font-size: 13px; font-family: system-ui;
+    cursor: pointer; transition: 0.15s;
+  }
+  button:hover { background: #1e7e3a; }
+  button.primary { background: linear-gradient(135deg, #00e676, #00b248); color: #061020; }
+  button.primary:hover { box-shadow: 0 4px 12px rgba(0,230,118,0.3); }
+  button.active { background: #00e676; color: #061020; }
+  
+  #airportMenu { position: absolute; display: none; grid-template-columns: repeat(4, 1fr); gap: 4px; background: rgba(4, 13, 8, 0.95); border: 1px solid #00e676; border-radius: 6px; padding: 6px; z-index: 50; transform: translate(-50%, -100%); }
+  #airportMenu button { padding: 6px 4px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #0a1c11; color: #e8f7ee; border: none; cursor: pointer; }
+  #airportMenu button:hover { background: #00e676; color: #061020; }
+  #airportMenu button.current { border: 1px solid #00e676; color: #00e676; }
+</style>
+</head>
+<body>
+
+<div id="mapContainer">
+  <canvas id="radar"></canvas>
+  <div id="airportMenu"></div>
+  
+  <div class="hud">
+    <span class="timer">Время: <b id="hudTimer">00:00</b></span>
+    <span>Спасено: <b id="hudScore">0</b></span>
+    <span class="danger">Потеряно: <b id="hudCrashes">0/5</b></span>
+  </div>
+</div>
+
+<div class="bottom-panel">
+  <div class="combined-section" id="actionPanel" style="opacity: 0.5; pointer-events: none;">
+    <div class="info-header">
+      <div><span class="flight-id" id="selId">Нет борта</span><span class="airline-name" id="selAir"></span></div>
+      <div class="route" id="selRoute">Маршрут: ---</div>
+    </div>
+    <div class="info-sub"><span>Топливо: <b id="selFuelTxt" style="color:#fff">100%</b></span></div>
+    <div class="fuel-bar-bg"><div class="fuel-bar-fill" id="selFuel"></div></div>
+    <div class="control-row">
+      <div class="control-label">Скорость:</div>
+      <div class="speed-btns">
+        <button data-speed="slow">Медл.</button>
+        <button data-speed="normal" class="active">Норм.</button>
+        <button data-speed="fast">Быстр.</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="log-section">
+    <div class="log-header">Системный журнал</div>
+    <div class="log-content" id="logContent"></div>
+  </div>
+  
+  <div class="action-section">
+    <button id="pauseBtn">⏸ Пауза</button>
+    <button id="resetBtn" class="primary">↻ Заново</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('radar'), ctx = canvas.getContext('2d');
+const airportMenuEl = document.getElementById('airportMenu');
+const logContentEl = document.getElementById('logContent');
+let W, H, BASE_W = 1920, BASE_H = 1080;
+
+function resizeCanvas() {
+  const container = document.getElementById('mapContainer');
+  W = container.clientWidth; H = container.clientHeight;
+  canvas.width = W; canvas.height = H;
+}
+window.addEventListener('resize', resizeCanvas);
+
+const AIRPORTS = [
+  { code: 'SVO', lat: 55.97, lng: 37.41, name: 'Москва', offX: -29, offY: -18 },
+  { code: 'KGD', lat: 54.89, lng: 20.59, name: 'Калининград', offX: -33, offY: -22 },
+  { code: 'LHR', lat: 51.47, lng: -0.45, name: 'Лондон', offX: -38, offY: -27 },
+  { code: 'JFK', lat: 40.64, lng: -73.78, name: 'Нью-Йорк', offX: -47, offY: -18 },
+  { code: 'LAX', lat: 33.94, lng: -118.40, name: 'Лос-Анджелес', offX: -2, offY: 1 },
+  { code: 'DXB', lat: 25.25, lng: 55.36, name: 'Дубай', offX: -30, offY: -29 },
+  { code: 'HND', lat: 35.54, lng: 139.78, name: 'Токио', offX: -38, offY: -37 },
+  { code: 'SYD', lat: -33.94, lng: 151.17, name: 'Сидней', offX: -45, offY: -65 },
+  { code: 'GRU', lat: -23.43, lng: -46.47, name: 'Сан-Паулу', offX: -45, offY: -65 },
+  { code: 'JNB', lat: -26.13, lng: 28.24, name: 'Йоханнесбург', offX: -116, offY: -200 },
+  { code: 'PEK', lat: 40.07, lng: 116.59, name: 'Пекин', offX: -45, offY: -27 },
+  { code: 'DEL', lat: 28.55, lng: 77.10, name: 'Дели', offX: -38, offY: -9 },
+  { code: 'SIN', lat: 1.36, lng: 103.99, name: 'Сингапур', offX: -35, offY: -27 },
+  { code: 'CAI', lat: 30.11, lng: 31.40, name: 'Каир', offX: -45, offY: -35 },
+  { code: 'MEX', lat: 19.43, lng: -99.07, name: 'Мехико', offX: -30, offY: -36 },
+  { code: 'SEA', lat: 47.45, lng: -122.31, name: 'Сиэтл', offX: -40, offY: -23 },
+  { code: 'CPT', lat: -33.97, lng: 18.60, name: 'Кейптаун', offX: -21, offY: -75 }
+];
+
+AIRPORTS.forEach(ap => {
+  const baseX = (ap.lng + 180) / 360 * BASE_W;
+  const baseY = (85 - ap.lat) / 150 * BASE_H;
+  ap.x = baseX + ap.offX; ap.y = baseY + ap.offY;
+});
+
+const DISASTERS = ['СМЕРЧ!', 'ТОРНАДО!', 'УРАГАН!'];
+const WEATHER_ZONES = ['ГРОЗА', 'ТУРБУЛЕНТНОСТЬ', 'ЛИВЕНЬ'];
+const AIRLINES = [
+  { name: 'Аэрофлот', code: 'SU' }, { name: 'Emirates', code: 'EK' },
+  { name: 'Lufthansa', code: 'LH' }, { name: 'British Airways', code: 'BA' },
+  { name: 'Air France', code: 'AF' }, { name: 'Delta', code: 'DL' },
+  { name: 'Qatar Airways', code: 'QR' }, { name: 'Singapore', code: 'SQ' }
+];
+
+let state, paused = false, selected = null, gameOver = false;
+let storms = [], noFlyZones = [], time = 0, maxPlanes = 3, spawnTimer = 0, stormTimer = 0, nfzTimer = 0;
+
+// ЗАГРУЗКА КАРТЫ
+const bgImage = new Image();
+bgImage.src = 'map.jpg'; 
+let bgLoaded = false;
+bgImage.onload = () => { bgLoaded = true; };
+
+function addLog(text, type = '') {
+  const div = document.createElement('div'); div.className = `log-msg ${type}`;
+  div.textContent = `> ${text}`; logContentEl.appendChild(div);
+  if (logContentEl.children.length > 5) logContentEl.removeChild(logContentEl.firstChild);
+  logContentEl.scrollTop = logContentEl.scrollHeight;
+}
+
+function makeFlight(origin, dest) {
+  const airline = AIRLINES[Math.floor(Math.random() * AIRLINES.length)];
+  const flightId = `${airline.code}-${Math.floor(100 + Math.random() * 900)}`;
+  addLog(`Взлетел ${flightId} (${origin.code} → ${dest.code})`, 'success');
+  return { id: flightId, airline: airline.name, origin, dest, x: origin.x, y: origin.y, speed: 50, baseSpeed: 50, mode: 'normal', status: 'flying', fuel: 100, angle: 0 };
+}
+
+function spawnRandomFlight() {
+  const o = AIRPORTS[Math.floor(Math.random() * AIRPORTS.length)];
+  let d; do { d = AIRPORTS[Math.floor(Math.random() * AIRPORTS.length)]; } while (d.code === o.code);
+  return makeFlight(o, d);
+}
+
+function resetGame() {
+  state = { planes: [], score: 0, crashes: 0 };
+  time = 0; maxPlanes = 3; spawnTimer = 0; stormTimer = 0; nfzTimer = 0; storms = []; noFlyZones = [];
+  paused = false; selected = null; gameOver = false;
+  logContentEl.innerHTML = ''; addLog('Смена открыта. Ожидаем борты...');
+  for (let i = 0; i < maxPlanes; i++) state.planes.push(spawnRandomFlight());
+  airportMenuEl.style.display = 'none';
+  document.getElementById('pauseBtn').textContent = '⏸ Пауза';
+  updateHUD(); updateSelectedInfo(); resizeCanvas();
+}
+
+function updateHUD() {
+  document.getElementById('hudTimer').textContent = `0${Math.floor(time/60)}:${Math.floor(time%60).toString().padStart(2,'0')}`;
+  document.getElementById('hudScore').textContent = Math.floor(state.score / 100);
+  document.getElementById('hudCrashes').textContent = `${state.crashes}/5`;
+}
+
+function draw() {
+  ctx.fillStyle = '#020604'; ctx.fillRect(0, 0, W, H);
+  const scaleX = W / BASE_W, scaleY = H / BASE_H;
+
+  // Фон
+  if (bgLoaded) {
+    ctx.drawImage(bgImage, 0, 0, W, H);
+  } else {
+    // Сетка, если карты нет
+    ctx.strokeStyle = 'rgba(0,230,118,0.1)'; ctx.lineWidth = 1;
+    for (let i = -180; i <= 180; i += 15) { const x = (i + 180) / 360 * W; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let i = -60; i <= 80; i += 15) { const y = (85 - i) / 150 * H; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  }
+
+  // Аэропорты
+  ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const ap of AIRPORTS) {
+    const px = ap.x * scaleX, py = ap.y * scaleY;
+    ctx.fillStyle = 'rgba(0,230,118,0.2)'; ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#00e676'; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(px - 20, py - 28, 40, 18, 4); ctx.fill();
+    ctx.fillStyle = '#00e676'; ctx.fillText(ap.code, px, py - 19);
+  }
+
+  // Зоны
+  for (const nfz of noFlyZones) {
+    const px = nfz.x * scaleX, py = nfz.y * scaleY, r = nfz.radius * scaleX;
+    ctx.fillStyle = 'rgba(255,235,59,0.15)'; ctx.strokeStyle = 'rgba(255,235,59,0.8)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,235,59,0.9)'; ctx.font = 'bold 14px system-ui';
+    ctx.fillText(nfz.name, px, py);
+  }
+  for (const storm of storms) {
+    const px = storm.x * scaleX, py = storm.y * scaleY, r = storm.radius * scaleX;
+    ctx.fillStyle = 'rgba(255,82,82,0.15)'; ctx.strokeStyle = 'rgba(255,82,82,0.7)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,82,82,0.9)'; ctx.font = 'bold 13px system-ui';
+    ctx.fillText(storm.name, px, py);
+  }
+
+  const activePlanes = state.planes.filter(p => p.status === 'flying');
+
+  // Маршруты
+  for (const p of activePlanes) {
+    if (p === selected) {
+      ctx.strokeStyle = 'rgba(0,230,118,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(p.x * scaleX, p.y * scaleY); ctx.lineTo(p.dest.x * scaleX, p.dest.y * scaleY); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  // Самолеты
+  for (const p of activePlanes) {
+    const isSelected = selected === p;
+    let color = isSelected ? '#00e676' : '#ff8a65';
+    if (p.fuel < 30) color = '#ff5252';
+
+    ctx.save(); ctx.translate(p.x * scaleX, p.y * scaleY); ctx.rotate(p.angle * Math.PI / 180);
+    ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 15;
+    
+    ctx.beginPath();
+    ctx.moveTo(16, 0); 
+    ctx.quadraticCurveTo(10, -3, 4, -3.5); 
+    ctx.lineTo(-2, -15); ctx.lineTo(-6, -15); ctx.lineTo(-6, -3.5); 
+    ctx.lineTo(-12, -2); ctx.lineTo(-15, -6); ctx.lineTo(-17, -6); ctx.lineTo(-15, 0); 
+    ctx.lineTo(-17, 6); ctx.lineTo(-15, 6); ctx.lineTo(-12, 2); ctx.lineTo(-6, 3.5); 
+    ctx.lineTo(-6, 15); ctx.lineTo(-2, 15); ctx.lineTo(4, 3.5); 
+    ctx.quadraticCurveTo(10, 3, 16, 0); 
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.shadowBlur = 0; 
+    ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(5, -1.5); ctx.lineTo(5, 1.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    if (isSelected) { ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.fillText(p.id, p.x * scaleX, p.y * scaleY - 22); }
+  }
+}
+
+function updateGame(dtReal) {
+  if (gameOver || paused) return;
+  const dtGame = dtReal * 2, dtSim = dtReal * 0.2;
+
+  time += dtGame;
+  if (time % 30 < dtGame && maxPlanes < 18) { maxPlanes++; addLog('Сложность повышена!', 'warning'); }
+  updateHUD();
+
+  stormTimer += dtGame; nfzTimer += dtGame;
+  if (stormTimer > 12) {
+    stormTimer = 0;
+    storms.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 80 + Math.random() * 60, life: 15, name: WEATHER_ZONES[Math.floor(Math.random() * WEATHER_ZONES.length)] });
+    addLog(`Метеосводка: непогода`, 'warning');
+  }
+  if (nfzTimer > 18) {
+    nfzTimer = 0;
+    noFlyZones.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 70 + Math.random() * 50, life: 20, name: DISASTERS[Math.floor(Math.random() * DISASTERS.length)] });
+    addLog(`ВНИМАНИЕ! Обнаружена катастрофа!`, 'danger');
+  }
+
+  storms = storms.filter(s => { s.life -= dtGame; return s.life > 0; });
+  noFlyZones = noFlyZones.filter(n => { n.life -= dtGame; return n.life > 0; });
+
+  const activePlanes = state.planes.filter(p => p.status === 'flying');
+  if (activePlanes.length < maxPlanes) {
+    spawnTimer += dtGame;
+    if (spawnTimer > 4) { spawnTimer = 0; state.planes.push(spawnRandomFlight()); }
+  }
+
+  for (let i = activePlanes.length - 1; i >= 0; i--) {
+    const p = activePlanes[i];
+    let fuelBurn = p.mode === 'fast' ? 0.7 : (p.mode === 'slow' ? 0.2 : 0.4);
+    p.fuel -= fuelBurn * dtGame;
+
+    const dx = p.dest.x - p.x, dy = p.dest.y - p.y, dist = Math.hypot(dx, dy);
+    if (dist > 0.1) {
+      p.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      p.x += Math.cos(p.angle * Math.PI / 180) * p.speed * dtSim;
+      p.y += Math.sin(p.angle * Math.PI / 180) * p.speed * dtSim;
+    }
+
+    for (const storm of storms) { if (Math.hypot(p.x - storm.x, p.y - storm.y) < storm.radius) { p.fuel -= 1.5 * dtGame; p.speed = 15; } }
+    if (!storms.some(s => Math.hypot(p.x - s.x, p.y - s.y) < s.radius)) p.speed = Math.min(p.baseSpeed, p.speed + 30 * dtGame);
+
+    let hitNFZ = false;
+    for (const nfz of noFlyZones) { if (Math.hypot(p.x - nfz.x, p.y - nfz.y) < nfz.radius) { hitNFZ = true; break; } }
+
+    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (dist < 30) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
+  }
+  state.planes = state.planes.filter(p => p.status === 'flying');
+  updateHUD();
+}
+
+function updateSelectedInfo() {
+  const infoEl = document.getElementById('actionPanel');
+  if (!selected || selected.status !== 'flying') {
+    infoEl.style.opacity = '0.5'; infoEl.style.pointerEvents = 'none';
+    document.getElementById('selId').textContent = 'Нет борта'; document.getElementById('selAir').textContent = '';
+    document.getElementById('selRoute').textContent = 'Маршрут: ---'; document.getElementById('selFuelTxt').textContent = '100%'; document.getElementById('selFuel').style.width = '100%';
+    return;
+  }
+  infoEl.style.opacity = '1'; infoEl.style.pointerEvents = 'auto';
+  document.getElementById('selId').textContent = selected.id;
+  document.getElementById('selAir').textContent = selected.airline;
+  document.getElementById('selRoute').textContent = `${selected.origin.code} → ${selected.dest.code}`;
+  document.getElementById('selFuelTxt').textContent = Math.max(0, Math.round(selected.fuel)) + '%';
+  document.getElementById('selFuel').style.width = Math.max(0, selected.fuel) + '%';
+  document.getElementById('selFuel').style.background = selected.fuel < 30 ? '#ff5252' : '#00e676';
+  document.querySelectorAll('.speed-btns button').forEach(b => b.classList.toggle('active', b.dataset.speed === selected.mode));
+}
+
+function showAirportMenu(plane, mx, my) {
+  airportMenuEl.innerHTML = '';
+  AIRPORTS.forEach(ap => {
+    const b = document.createElement('button'); b.textContent = ap.code;
+    if (ap.code === plane.dest.code) b.classList.add('current');
+    b.onclick = (e) => { e.stopPropagation(); plane.dest = ap; addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); };
+    airportMenuEl.appendChild(b);
+  });
+  airportMenuEl.style.display = 'grid';
+  const scaleX = W / BASE_W, scaleY = H / BASE_H;
+  airportMenuEl.style.left = (plane.x * scaleX) + 'px';
+  airportMenuEl.style.top = (plane.y * scaleY - 20) + 'px';
+}
+
+canvas.addEventListener('click', (e) => {
+  if (gameOver) return;
+  const rect = canvas.getBoundingClientRect(), mx = (e.clientX - rect.left) * (canvas.width / rect.width), my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const scaleX = W / BASE_W, scaleY = H / BASE_H;
+  let clicked = null;
+  state.planes.filter(p => p.status === 'flying').forEach(p => { if (Math.hypot(mx - p.x * scaleX, my - p.y * scaleY) < 30) clicked = p; });
+  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); }
+  else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
+});
+
+document.querySelectorAll('.speed-btns button').forEach(btn => {
+  btn.onclick = () => {
+    if (!selected) return;
+    selected.mode = btn.dataset.speed; selected.baseSpeed = selected.mode === 'fast' ? 120 : (selected.mode === 'slow' ? 25 : 50);
+    updateSelectedInfo();
+  };
+});
+
+document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; } };
+document.getElementById('resetBtn').onclick = resetGame;
+
+let last = 0;
+function loop(ts) {
+  if (!last) last = ts; const dt = Math.min((ts - last) / 1000, 0.1); last = ts;
+  updateGame(dt); draw(); requestAnimationFrame(loop);
+}
+resetGame(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
