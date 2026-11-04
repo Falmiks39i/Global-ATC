@@ -196,7 +196,8 @@ const canvas = document.getElementById('radar'), ctx = canvas.getContext('2d');
 const airportMenuEl = document.getElementById('airportMenu');
 const logContentEl = document.getElementById('logContent');
 let W, H, BASE_W = 1920, BASE_H = 1080;
-let mapShiftX = -7, mapShiftY = 93; // Твои подобранные значения
+// ТВОИ ТОЧНЫЕ ЗНАЧЕНИЯ КАЛИБРОВКИ
+let mapShiftX = -7, mapShiftY = 93; 
 
 function resizeCanvas() {
   const container = document.getElementById('mapContainer');
