@@ -8,8 +8,15 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body, html { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #020604; color: #e8f7ee; display: flex; flex-direction: column; user-select: none; }
   
-  #mapContainer { position: relative; flex-grow: 1; background: #020604; overflow: hidden; }
+  #mapContainer { position: relative; flex-grow: 1; background: #020604; overflow: hidden; transition: filter 0.3s; }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+  /* СТАРТОВЫЙ ЭКРАН */
+  #startScreen { position: absolute; inset: 0; background: rgba(2,6,4,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; backdrop-filter: blur(5px); }
+  #startScreen h1 { font-size: 4rem; color: #00e676; margin-bottom: 10px; text-shadow: 0 0 30px rgba(0,230,118,0.4); font-weight: 800; letter-spacing: 2px;}
+  #startScreen p { font-size: 1.2rem; color: #8fb8a0; margin-bottom: 40px; max-width: 600px; line-height: 1.6;}
+  #startScreen button { font-size: 1.5rem; padding: 16px 60px; border-radius: 8px; background: linear-gradient(135deg, #00e676, #00b248); color: #061020; border: none; font-weight: 800; cursor: pointer; transition: 0.3s; box-shadow: 0 0 20px rgba(0,230,118,0.3); }
+  #startScreen button:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,230,118,0.6); }
   
   .hud { position: absolute; top: 16px; left: 16px; display: flex; gap: 16px; background: rgba(4,13,8,0.85); padding: 10px 18px; border-radius: 8px; border: 1px solid #1b4b2c; font-size: 14px; pointer-events: none; }
   .hud b { color: #00e676; font-family: monospace; font-size: 16px;}
@@ -17,7 +24,6 @@
   .hud .timer b { color: #ffb74d; }
   
   .bottom-panel { height: 130px; flex-shrink: 0; background: #091c10; border-top: 2px solid #1b4b2c; display: flex; padding: 12px; gap: 12px; z-index: 10; }
-  
   .combined-section { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #040d06; border: 1px solid #1b4b2c; border-radius: 6px; padding: 10px 16px; }
   .info-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .flight-id { color: #00e676; font-weight: 700; font-size: 16px; }
@@ -55,13 +61,27 @@
   #airportMenu button:hover { background: #00e676; color: #061020; }
   #airportMenu button.current { border: 1px solid #00e676; color: #00e676; }
 
-  /* ПАНЕЛЬ КАЛИБРОВКИ */
   #calibPanel { position: absolute; bottom: 20px; left: 20px; background: rgba(4,13,8,0.9); border: 1px solid #ffb74d; padding: 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
   #calibPanel label { font-size: 12px; color: #fff; display: flex; justify-content: space-between; align-items: center; gap: 10px;}
   #calibPanel input { width: 100px; }
+
+  /* МОДАЛЬНОЕ ОКНО НАСТРОЕК */
+  #settingsModal { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 300; backdrop-filter: blur(5px); }
+  .modal-content { background: #091c10; border: 2px solid #00e676; border-radius: 12px; padding: 30px; width: 350px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 0 40px rgba(0,230,118,0.2); }
+  .modal-content h2 { color: #00e676; text-align: center; margin-bottom: 10px; }
+  .setting-row { display: flex; flex-direction: column; gap: 8px; }
+  .setting-row label { font-size: 14px; color: #8fb8a0; display: flex; justify-content: space-between; }
+  .setting-row input[type="range"] { width: 100%; cursor: pointer; accent-color: #00e676; }
+  .modal-content button { margin-top: 10px; }
 </style>
 </head>
 <body>
+
+<div id="startScreen">
+  <h1>GLOBAL ATC</h1>
+  <p>Вы — главный диспетчер. На вашем радаре десятки бортов, но погода портится с каждой минутой. Успевайте менять курсы, обходить смерчи и сажать самолеты, пока кризис не поглотил все.</p>
+  <button id="playBtn">НАЧАТЬ СМЕНУ</button>
+</div>
 
 <div id="mapContainer">
   <canvas id="radar"></canvas>
@@ -77,6 +97,22 @@
     <div style="color: #ffb74d; font-weight: bold; margin-bottom: 4px;">⚙ Калибровка карты</div>
     <label>Сдвиг X: <input type="range" id="calX" min="-200" max="200" value="-42"> <span id="valX">-42</span></label>
     <label>Сдвиг Y: <input type="range" id="calY" min="-200" max="200" value="-31"> <span id="valY">-31</span></label>
+  </div>
+
+  <!-- ОКНО НАСТРОЕК -->
+  <div id="settingsModal">
+    <div class="modal-content">
+      <h2>НАСТРОЙКИ</h2>
+      <div class="setting-row">
+        <label>Громкость звука: <span id="volVal">50%</span></label>
+        <input type="range" id="volSlider" min="0" max="100" value="50">
+      </div>
+      <div class="setting-row">
+        <label>Яркость экрана: <span id="brightVal">100%</span></label>
+        <input type="range" id="brightSlider" min="30" max="150" value="100">
+      </div>
+      <button id="closeSettings" class="primary">Сохранить</button>
+    </div>
   </div>
 </div>
 
@@ -106,10 +142,69 @@
   <div class="action-section">
     <button id="pauseBtn">⏸ Пауза</button>
     <button id="resetBtn" class="primary">↻ Заново</button>
+    <button id="settingsBtn" style="background: #2a4d7a; margin-top: 5px;">⚙ Настройки</button>
   </div>
 </div>
 
 <script>
+// ============ НАСТРОЙКИ ============
+let masterVolume = 0.5;
+let masterBrightness = 1.0;
+
+document.getElementById('settingsBtn').onclick = () => { document.getElementById('settingsModal').style.display = 'flex'; playSound('click'); };
+document.getElementById('closeSettings').onclick = () => { document.getElementById('settingsModal').style.display = 'none'; playSound('click'); };
+
+document.getElementById('volSlider').addEventListener('input', (e) => {
+  masterVolume = e.target.value / 100;
+  document.getElementById('volVal').textContent = e.target.value + '%';
+});
+
+document.getElementById('brightSlider').addEventListener('input', (e) => {
+  masterBrightness = e.target.value / 100;
+  document.getElementById('brightVal').textContent = e.target.value + '%';
+  document.getElementById('mapContainer').style.filter = `brightness(${masterBrightness})`;
+});
+
+// ============ ЗВУКОВОЙ ДВИЖОК ============
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playSound(type) {
+  if (!audioCtx || masterVolume === 0) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+
+  if (type === 'land') {
+    osc.type = 'sine'; osc.frequency.setValueAtTime(440, now); osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+    gain.gain.setValueAtTime(0.1 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    osc.start(now); osc.stop(now + 0.4);
+  } else if (type === 'crash') {
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+    gain.gain.setValueAtTime(0.2 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+    osc.start(now); osc.stop(now + 0.5);
+  } else if (type === 'alert') {
+    osc.type = 'square'; osc.frequency.setValueAtTime(600, now);
+    gain.gain.setValueAtTime(0.05 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+    setTimeout(() => {
+      const o2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+      o2.connect(g2); g2.connect(audioCtx.destination);
+      o2.type = 'square'; o2.frequency.setValueAtTime(600, audioCtx.currentTime);
+      g2.gain.setValueAtTime(0.05 * masterVolume, audioCtx.currentTime); g2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      o2.start(audioCtx.currentTime); o2.stop(audioCtx.currentTime + 0.1);
+    }, 150);
+  } else if (type === 'click') {
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(800, now);
+    gain.gain.setValueAtTime(0.05 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
+  }
+}
+
 const canvas = document.getElementById('radar'), ctx = canvas.getContext('2d');
 const airportMenuEl = document.getElementById('airportMenu');
 const logContentEl = document.getElementById('logContent');
@@ -161,7 +256,7 @@ const AIRLINES = [
   { name: 'Qatar Airways', code: 'QR' }, { name: 'Singapore', code: 'SQ' }
 ];
 
-let state, paused = false, selected = null, gameOver = false;
+let state, paused = false, selected = null, gameOver = false, gameStarted = false;
 let storms = [], noFlyZones = [], time = 0, maxPlanes = 2, spawnTimer = 0, stormTimer = 0, nfzTimer = 0, lastDoubleTime = 0;
 
 const bgImage = new Image();
@@ -180,6 +275,7 @@ function makeFlight(origin, dest) {
   const airline = AIRLINES[Math.floor(Math.random() * AIRLINES.length)];
   const flightId = `${airline.code}-${Math.floor(100 + Math.random() * 900)}`;
   addLog(`Взлетел ${flightId} (${origin.code} → ${dest.code})`, 'success');
+  playSound('land');
   
   return { 
     id: flightId, airline: airline.name, origin, dest, 
@@ -198,10 +294,11 @@ function resetGame() {
   state = { planes: [], score: 0, crashes: 0 };
   time = 0; maxPlanes = 2; spawnTimer = 0; stormTimer = 0; nfzTimer = 0; lastDoubleTime = 0;
   storms = []; noFlyZones = [];
-  paused = false; selected = null; gameOver = false;
+  paused = false; selected = null; gameOver = false; gameStarted = true;
   logContentEl.innerHTML = ''; addLog('Смена открыта. Ожидаем 2 борта...');
   for (let i = 0; i < 2; i++) state.planes.push(spawnRandomFlight());
   airportMenuEl.style.display = 'none';
+  document.getElementById('startScreen').style.display = 'none';
   document.getElementById('pauseBtn').textContent = '⏸ Пауза';
   updateHUD(); updateSelectedInfo(); resizeCanvas();
 }
@@ -290,17 +387,17 @@ function draw() {
 }
 
 function updateGame(dtReal) {
-  if (gameOver || paused) return;
+  if (gameOver || paused || !gameStarted) return;
   const dtGame = dtReal * 2, dtSim = dtReal * 0.4;
 
   time += dtGame;
   
-  // Удвоение лимита каждые 30 секунд
   if (time - lastDoubleTime >= 30) {
     lastDoubleTime = time;
     if (maxPlanes < 64) {
       maxPlanes *= 2;
       addLog(`Трафик возрос! Лимит бортов: ${maxPlanes}`, 'warning');
+      playSound('alert');
     }
   }
   updateHUD();
@@ -310,11 +407,13 @@ function updateGame(dtReal) {
     stormTimer = 0;
     storms.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 80 + Math.random() * 60, life: 15, name: WEATHER_ZONES[Math.floor(Math.random() * WEATHER_ZONES.length)] });
     addLog(`Метеосводка: непогода`, 'warning');
+    playSound('alert');
   }
   if (nfzTimer > 18) {
     nfzTimer = 0;
     noFlyZones.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 70 + Math.random() * 50, life: 20, name: DISASTERS[Math.floor(Math.random() * DISASTERS.length)] });
     addLog(`ВНИМАНИЕ! Обнаружена катастрофа!`, 'danger');
+    playSound('alert');
   }
 
   storms = storms.filter(s => { s.life -= dtGame; return s.life > 0; });
@@ -358,9 +457,9 @@ function updateGame(dtReal) {
     let hitNFZ = false;
     for (const nfz of noFlyZones) { if (Math.hypot(p.x - nfz.x, p.y - nfz.y) < nfz.radius) { hitNFZ = true; break; } }
 
-    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
+    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); playSound('land'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
   }
   state.planes = state.planes.filter(p => p.status === 'flying');
   updateHUD();
@@ -394,6 +493,7 @@ function showAirportMenu(plane, mx, my) {
       plane.dest = ap; 
       plane.startX = plane.x; plane.startY = plane.y; plane.t = 0; 
       addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); 
+      playSound('click');
     };
     airportMenuEl.appendChild(b);
   });
@@ -410,7 +510,7 @@ canvas.addEventListener('click', (e) => {
   state.planes.filter(p => p.status === 'flying').forEach(p => { 
     if (Math.hypot(mx - (p.x * scaleX + mapShiftX), my - (p.y * scaleY + mapShiftY)) < 30) clicked = p; 
   });
-  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); }
+  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); playSound('click'); }
   else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
 });
 
@@ -419,11 +519,12 @@ document.querySelectorAll('.speed-btns button').forEach(btn => {
     if (!selected) return;
     selected.mode = btn.dataset.speed; selected.baseSpeed = selected.mode === 'fast' ? 0.1 : (selected.mode === 'slow' ? 0.02 : 0.05);
     updateSelectedInfo();
+    playSound('click');
   };
 });
 
-document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; } };
-document.getElementById('resetBtn').onclick = resetGame;
+document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; playSound('click'); } };
+document.getElementById('resetBtn').onclick = () => { resetGame(); playSound('click'); };
 
 let last = 0;
 function loop(ts) {
