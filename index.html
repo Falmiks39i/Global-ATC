@@ -7,17 +7,14 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body, html { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #020604; color: #e8f7ee; display: flex; flex-direction: column; user-select: none; }
-  #mapContainer { position: relative; flex-grow: 1; background: #020604; overflow: hidden; transition: filter 0.3s; }
+  #mapContainer { position: relative; flex-grow: 1; background: #020604; overflow: hidden; }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
-  #startScreen { position: absolute; inset: 0; background: rgba(2,6,4,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; backdrop-filter: blur(5px); }
-  #startScreen h1 { font-size: 4rem; color: #00e676; margin-bottom: 10px; text-shadow: 0 0 30px rgba(0,230,118,0.4); font-weight: 800; letter-spacing: 2px; }
-  #startScreen p { font-size: 1.2rem; color: #8fb8a0; margin-bottom: 40px; max-width: 600px; line-height: 1.6; }
-  #startScreen button { font-size: 1.5rem; padding: 16px 60px; border-radius: 8px; background: linear-gradient(135deg, #00e676, #00b248); color: #061020; border: none; font-weight: 800; cursor: pointer; transition: 0.3s; box-shadow: 0 0 20px rgba(0,230,118,0.3); }
-  #startScreen button:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,230,118,0.6); }
+  #startScreen { position: absolute; inset: 0; background: rgba(2,6,4,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
+  #startScreen h1 { font-size: 4rem; color: #00e676; margin-bottom: 10px; font-weight: 800; }
+  #startScreen p { font-size: 1.2rem; color: #8fb8a0; margin-bottom: 40px; max-width: 600px; }
+  #startScreen button { font-size: 1.5rem; padding: 16px 60px; border-radius: 8px; background: #00e676; color: #061020; border: none; font-weight: 800; cursor: pointer; }
   .hud { position: absolute; top: 16px; left: 16px; display: flex; gap: 16px; background: rgba(4,13,8,0.85); padding: 10px 18px; border-radius: 8px; border: 1px solid #1b4b2c; font-size: 14px; pointer-events: none; }
   .hud b { color: #00e676; font-family: monospace; font-size: 16px; }
-  .hud .danger b { color: #ff5252; }
-  .hud .timer b { color: #ffb74d; }
   .bottom-panel { height: 130px; flex-shrink: 0; background: #091c10; border-top: 2px solid #1b4b2c; display: flex; padding: 12px; gap: 12px; z-index: 10; }
   .combined-section { flex: 1; display: flex; flex-direction: column; justify-content: space-between; background: #040d06; border: 1px solid #1b4b2c; border-radius: 6px; padding: 10px 16px; }
   .info-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
@@ -27,38 +24,30 @@
   .route b { color: #00e676; }
   .info-sub { display: flex; justify-content: space-between; font-size: 12px; color: #8fb8a0; margin-bottom: 4px; }
   .fuel-bar-bg { width: 100%; height: 4px; background: #1b4b2c; border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
-  .fuel-bar-fill { height: 100%; background: #00e676; width: 100%; transition: width 0.3s, background-color 0.3s; }
+  .fuel-bar-fill { height: 100%; background: #00e676; width: 100%; }
   .control-row { display: flex; gap: 12px; align-items: center; }
   .control-label { font-size: 12px; color: #8fb8a0; min-width: 60px; }
   .speed-btns { display: flex; gap: 6px; flex-grow: 1; }
   .speed-btns button { flex: 1; padding: 6px; font-size: 12px; }
   .log-section { flex: 1; display: flex; flex-direction: column; background: #020604; border: 1px solid #1b4b2c; border-radius: 6px; padding: 8px 12px; overflow: hidden; font-family: monospace; font-size: 12px; }
-  .log-header { font-size: 11px; color: #00e676; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #1b4b2c; padding-bottom: 4px; }
+  .log-header { font-size: 11px; color: #00e676; margin-bottom: 4px; text-transform: uppercase; border-bottom: 1px solid #1b4b2c; padding-bottom: 4px; }
   .log-content { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .action-section { display: flex; flex-direction: column; gap: 8px; justify-content: center; width: 160px; flex-shrink: 0; }
-  button { padding: 10px; border: none; border-radius: 4px; background: #155a2a; color: #e8f7ee; font-weight: 600; font-size: 13px; font-family: system-ui; cursor: pointer; transition: 0.15s; }
+  button { padding: 10px; border: none; border-radius: 4px; background: #155a2a; color: #e8f7ee; font-weight: 600; font-size: 13px; cursor: pointer; }
   button:hover { background: #1e7e3a; }
-  button.primary { background: linear-gradient(135deg, #00e676, #00b248); color: #061020; }
-  button.primary:hover { box-shadow: 0 4px 12px rgba(0,230,118,0.3); }
+  button.primary { background: #00e676; color: #061020; }
   button.active { background: #00e676; color: #061020; }
   #airportMenu { position: absolute; display: none; grid-template-columns: repeat(4, 1fr); gap: 4px; background: rgba(4, 13, 8, 0.95); border: 1px solid #00e676; border-radius: 6px; padding: 6px; z-index: 50; transform: translate(-50%, -100%); }
   #airportMenu button { padding: 6px 4px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #0a1c11; color: #e8f7ee; border: none; cursor: pointer; }
   #airportMenu button:hover { background: #00e676; color: #061020; }
   #airportMenu button.current { border: 1px solid #00e676; color: #00e676; }
-  #settingsModal { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 300; backdrop-filter: blur(5px); }
-  .modal-content { background: #091c10; border: 2px solid #00e676; border-radius: 12px; padding: 30px; width: 350px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 0 40px rgba(0,230,118,0.2); }
-  .modal-content h2 { color: #00e676; text-align: center; margin-bottom: 10px; }
-  .setting-row { display: flex; flex-direction: column; gap: 8px; }
-  .setting-row label { font-size: 14px; color: #8fb8a0; display: flex; justify-content: space-between; }
-  .setting-row input[type="range"] { width: 100%; cursor: pointer; accent-color: #00e676; }
-  .modal-content button { margin-top: 10px; }
 </style>
 </head>
 <body>
 
 <div id="startScreen">
   <h1>GLOBAL ATC</h1>
-  <p>Вы — главный диспетчер. На вашем радаре десятки бортов, но погода портится с каждой минутой. Успевайте менять курсы, обходить смерчи и сажать самолеты, пока кризис не поглотил все.</p>
+  <p>Вы — главный диспетчер. Управляйте трафиком.</p>
   <button id="playBtn">НАЧАТЬ СМЕНУ</button>
 </div>
 
@@ -66,23 +55,9 @@
   <canvas id="radar"></canvas>
   <div id="airportMenu"></div>
   <div class="hud">
-    <span class="timer">Время: <b id="hudTimer">00:00</b></span>
+    <span>Время: <b id="hudTimer">00:00</b></span>
     <span>Спасено: <b id="hudScore">0</b></span>
     <span class="danger">Потеряно: <b id="hudCrashes">0/5</b></span>
-  </div>
-  <div id="settingsModal">
-    <div class="modal-content">
-      <h2>НАСТРОЙКИ</h2>
-      <div class="setting-row">
-        <label>Громкость звука: <span id="volVal">50%</span></label>
-        <input type="range" id="volSlider" min="0" max="100" value="50">
-      </div>
-      <div class="setting-row">
-        <label>Яркость экрана: <span id="brightVal">100%</span></label>
-        <input type="range" id="brightSlider" min="30" max="150" value="100">
-      </div>
-      <button id="closeSettings" class="primary">Сохранить</button>
-    </div>
   </div>
 </div>
 
@@ -110,30 +85,10 @@
   <div class="action-section">
     <button id="pauseBtn">⏸ Пауза</button>
     <button id="resetBtn" class="primary">↻ Заново</button>
-    <button id="settingsBtn" style="background: #2a4d7a; margin-top: 5px;">⚙ Настройки</button>
   </div>
 </div>
 
 <script>
-let masterVolume = 0.5, masterBrightness = 1.0;
-document.getElementById('settingsBtn').onclick = () => { document.getElementById('settingsModal').style.display = 'flex'; playSound('click'); };
-document.getElementById('closeSettings').onclick = () => { document.getElementById('settingsModal').style.display = 'none'; playSound('click'); };
-document.getElementById('volSlider').addEventListener('input', (e) => { masterVolume = e.target.value / 100; document.getElementById('volVal').textContent = e.target.value + '%'; });
-document.getElementById('brightSlider').addEventListener('input', (e) => { masterBrightness = e.target.value / 100; document.getElementById('brightVal').textContent = e.target.value + '%'; document.getElementById('mapContainer').style.filter = `brightness(${masterBrightness})`; });
-
-let audioCtx;
-function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
-function playSound(type) {
-  if (!audioCtx || masterVolume === 0) return;
-  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  const now = audioCtx.currentTime;
-  if (type === 'land') { osc.type = 'sine'; osc.frequency.setValueAtTime(440, now); osc.frequency.exponentialRampToValueAtTime(880, now + 0.1); gain.gain.setValueAtTime(0.1 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4); }
-  else if (type === 'crash') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.5); gain.gain.setValueAtTime(0.2 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5); osc.start(now); osc.stop(now + 0.5); }
-  else if (type === 'alert') { osc.type = 'square'; osc.frequency.setValueAtTime(600, now); gain.gain.setValueAtTime(0.05 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); setTimeout(() => { const o2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain(); o2.connect(g2); g2.connect(audioCtx.destination); o2.type = 'square'; o2.frequency.setValueAtTime(600, audioCtx.currentTime); g2.gain.setValueAtTime(0.05 * masterVolume, audioCtx.currentTime); g2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); o2.start(audioCtx.currentTime); o2.stop(audioCtx.currentTime + 0.1); }, 150); }
-  else if (type === 'click') { osc.type = 'triangle'; osc.frequency.setValueAtTime(800, now); gain.gain.setValueAtTime(0.05 * masterVolume, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05); osc.start(now); osc.stop(now + 0.05); }
-}
-
 const canvas = document.getElementById('radar'), ctx = canvas.getContext('2d'), airportMenuEl = document.getElementById('airportMenu'), logContentEl = document.getElementById('logContent');
 let W, H, BASE_W = 1920, BASE_H = 1080, mapShiftX = -7, mapShiftY = 93;
 function resizeCanvas() { const container = document.getElementById('mapContainer'); W = container.clientWidth; H = container.clientHeight; canvas.width = W; canvas.height = H; }
@@ -170,11 +125,11 @@ function makeFlight(origin, dest) {
   const airline = AIRLINES[Math.floor(Math.random() * AIRLINES.length)];
   const flightId = `${airline.code}-${Math.floor(100 + Math.random() * 900)}`;
   addLog(`Взлетел ${flightId} (${origin.code} → ${dest.code})`, 'success');
-  playSound('land');
   return { id: flightId, airline: airline.name, origin, dest, x: origin.x, y: origin.y, startX: origin.x, startY: origin.y, t: 0, speed: 0.05, baseSpeed: 0.05, mode: 'normal', status: 'flying', fuel: 100, angle: 0 };
 }
 function spawnRandomFlight() { const o = AIRPORTS[Math.floor(Math.random() * AIRPORTS.length)]; let d; do { d = AIRPORTS[Math.floor(Math.random() * AIRPORTS.length)]; } while (d.code === o.code); return makeFlight(o, d); }
- function resetGame() {
+
+function resetGame() {
   state = { planes: [], score: 0, crashes: 0 }; time = 0; maxPlanes = 2; spawnTimer = 0; stormTimer = 0; nfzTimer = 0; lastDoubleTime = 0; storms = []; noFlyZones = [];
   paused = false; selected = null; gameOver = false; gameStarted = true;
   logContentEl.innerHTML = ''; addLog('Смена открыта. Ожидаем 2 борта...');
@@ -201,11 +156,11 @@ function updateGame(dtReal) {
   if (gameOver || paused || !gameStarted) return;
   const dtGame = dtReal * 2, dtSim = dtReal * 0.4;
   time += dtGame;
-  if (time - lastDoubleTime >= 30) { lastDoubleTime = time; if (maxPlanes < 64) { maxPlanes *= 2; addLog(`Трафик возрос! Лимит бортов: ${maxPlanes}`, 'warning'); playSound('alert'); } }
+  if (time - lastDoubleTime >= 30) { lastDoubleTime = time; if (maxPlanes < 64) { maxPlanes *= 2; addLog(`Трафик возрос! Лимит бортов: ${maxPlanes}`, 'warning'); } }
   updateHUD();
   stormTimer += dtGame; nfzTimer += dtGame;
-  if (stormTimer > 12) { stormTimer = 0; storms.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 80 + Math.random() * 60, life: 15, name: WEATHER_ZONES[Math.floor(Math.random() * WEATHER_ZONES.length)] }); addLog(`Метеосводка: непогода`, 'warning'); playSound('alert'); }
-  if (nfzTimer > 18) { nfzTimer = 0; noFlyZones.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 70 + Math.random() * 50, life: 20, name: DISASTERS[Math.floor(Math.random() * DISASTERS.length)] }); addLog(`ВНИМАНИЕ! Обнаружена катастрофа!`, 'danger'); playSound('alert'); }
+  if (stormTimer > 12) { stormTimer = 0; storms.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 80 + Math.random() * 60, life: 15, name: WEATHER_ZONES[Math.floor(Math.random() * WEATHER_ZONES.length)] }); addLog(`Метеосводка: непогода`, 'warning'); }
+  if (nfzTimer > 18) { nfzTimer = 0; noFlyZones.push({ x: 200 + Math.random() * (BASE_W - 400), y: 200 + Math.random() * (BASE_H - 400), radius: 70 + Math.random() * 50, life: 20, name: DISASTERS[Math.floor(Math.random() * DISASTERS.length)] }); addLog(`ВНИМАНИЕ! Обнаружена катастрофа!`, 'danger'); }
   storms = storms.filter(s => { s.life -= dtGame; return s.life > 0; }); noFlyZones = noFlyZones.filter(n => { n.life -= dtGame; return n.life > 0; });
   const activePlanes = state.planes.filter(p => p.status === 'flying');
   if (activePlanes.length < maxPlanes) { spawnTimer += dtGame; if (spawnTimer > 2) { spawnTimer = 0; state.planes.push(spawnRandomFlight()); } }
@@ -215,9 +170,9 @@ function updateGame(dtReal) {
     if (dist > 0.1) { p.t += (p.baseSpeed * dtSim) / dist; if (p.t > 1) p.t = 1; const midX = (startX + endX) / 2, midY = (startY + endY) / 2, arcOffset = dist * 0.2, angle = Math.atan2(endY - startY, endX - startX); const cpX = midX - Math.sin(angle) * arcOffset, cpY = midY + Math.cos(angle) * arcOffset; const mt = 1 - p.t; p.x = mt * mt * startX + 2 * mt * p.t * cpX + p.t * p.t * endX; p.y = mt * mt * startY + 2 * mt * p.t * cpY + p.t * p.t * endY; const tx = 2 * mt * (cpX - startX) + 2 * p.t * (endX - cpX), ty = 2 * mt * (cpY - startY) + 2 * p.t * (endY - cpY); p.angle = Math.atan2(ty, tx) * 180 / Math.PI; }
     for (const storm of storms) { if (Math.hypot(p.x - storm.x, p.y - storm.y) < storm.radius) { p.fuel -= 1.5 * dtGame; } }
     let hitNFZ = false; for (const nfz of noFlyZones) { if (Math.hypot(p.x - nfz.x, p.y - nfz.y) < nfz.radius) { hitNFZ = true; break; } }
-    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); playSound('land'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
+    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
   }
   state.planes = state.planes.filter(p => p.status === 'flying'); updateHUD();
 }
@@ -231,7 +186,7 @@ function updateSelectedInfo() {
 
 function showAirportMenu(plane, mx, my) {
   airportMenuEl.innerHTML = '';
-  AIRPORTS.forEach(ap => { const b = document.createElement('button'); b.textContent = ap.code; if (ap.code === plane.dest.code) b.classList.add('current'); b.onclick = (e) => { e.stopPropagation(); plane.dest = ap; plane.startX = plane.x; plane.startY = plane.y; plane.t = 0; addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); playSound('click'); }; airportMenuEl.appendChild(b); });
+  AIRPORTS.forEach(ap => { const b = document.createElement('button'); b.textContent = ap.code; if (ap.code === plane.dest.code) b.classList.add('current'); b.onclick = (e) => { e.stopPropagation(); plane.dest = ap; plane.startX = plane.x; plane.startY = plane.y; plane.t = 0; addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); }; airportMenuEl.appendChild(b); });
   airportMenuEl.style.display = 'grid'; airportMenuEl.style.left = mx + 'px'; airportMenuEl.style.top = (my - 20) + 'px';
 }
 
@@ -239,14 +194,14 @@ canvas.addEventListener('click', (e) => {
   if (gameOver) return;
   const rect = canvas.getBoundingClientRect(), mx = (e.clientX - rect.left) * (canvas.width / rect.width), my = (e.clientY - rect.top) * (canvas.height / rect.height), scaleX = W / BASE_W, scaleY = H / BASE_H;
   let clicked = null; state.planes.filter(p => p.status === 'flying').forEach(p => { if (Math.hypot(mx - (p.x * scaleX + mapShiftX), my - (p.y * scaleY + mapShiftY)) < 30) clicked = p; });
-  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); playSound('click'); } else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
+  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); } else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
 });
 
-document.querySelectorAll('.speed-btns button').forEach(btn => { btn.onclick = () => { if (!selected) return; selected.mode = btn.dataset.speed; selected.baseSpeed = selected.mode === 'fast' ? 0.1 : (selected.mode === 'slow' ? 0.02 : 0.05); updateSelectedInfo(); playSound('click'); }; });
+document.querySelectorAll('.speed-btns button').forEach(btn => { btn.onclick = () => { if (!selected) return; selected.mode = btn.dataset.speed; selected.baseSpeed = selected.mode === 'fast' ? 0.1 : (selected.mode === 'slow' ? 0.02 : 0.05); updateSelectedInfo(); }; });
 
-document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; playSound('click'); } };
-document.getElementById('resetBtn').onclick = () => { resetGame(); playSound('click'); };
-document.getElementById('playBtn').onclick = () => { initAudio(); playSound('land'); resetGame(); };
+document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; } };
+document.getElementById('resetBtn').onclick = () => { resetGame(); };
+document.getElementById('playBtn').onclick = () => { resetGame(); };
 
 let last = 0;
 function loop(ts) { if (!last) last = ts; const dt = Math.min((ts - last) / 1000, 0.1); last = ts; updateGame(dt); draw(); requestAnimationFrame(loop); }
