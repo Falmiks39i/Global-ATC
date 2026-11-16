@@ -196,7 +196,9 @@ const canvas = document.getElementById('radar'), ctx = canvas.getContext('2d');
 const airportMenuEl = document.getElementById('airportMenu');
 const logContentEl = document.getElementById('logContent');
 let W, H, BASE_W = 1920, BASE_H = 1080;
-let mapShiftX = -7, mapShiftY = 93; 
+
+// Сдвиг применяется ОДИН РАЗ при инициализации аэропортов
+const MAP_SHIFT_X = -7, MAP_SHIFT_Y = 93;
 
 function resizeCanvas() {
   const container = document.getElementById('mapContainer');
@@ -228,7 +230,8 @@ const AIRPORTS = [
 AIRPORTS.forEach(ap => {
   const baseX = (ap.lng + 180) / 360 * BASE_W;
   const baseY = (85 - ap.lat) / 150 * BASE_H;
-  ap.x = baseX + ap.offX; ap.y = baseY + ap.offY;
+  ap.x = baseX + ap.offX + MAP_SHIFT_X;
+  ap.y = baseY + ap.offY + MAP_SHIFT_Y;
 });
 
 const DISASTERS = ['СМЕРЧ!', 'ТОРНАДО!', 'УРАГАН!'];
@@ -239,6 +242,8 @@ const AIRLINES = [
   { name: 'Air France', code: 'AF' }, { name: 'Delta', code: 'DL' },
   { name: 'Qatar Airways', code: 'QR' }, { name: 'Singapore', code: 'SQ' }
 ];
+
+const SPEEDS = { slow: 30, normal: 70, fast: 140 };
 
 let state, paused = false, selected = null, gameOver = false, gameStarted = false;
 let storms = [], noFlyZones = [], time = 0, maxPlanes = 2, spawnTimer = 0, stormTimer = 0, nfzTimer = 0, lastDoubleTime = 0;
@@ -264,7 +269,7 @@ function makeFlight(origin, dest) {
   return { 
     id: flightId, airline: airline.name, origin, dest, 
     x: origin.x, y: origin.y, startX: origin.x, startY: origin.y, t: 0,
-    speed: 0.05, baseSpeed: 0.05, mode: 'normal', status: 'flying', fuel: 100, angle: 0 
+    speed: SPEEDS.normal, mode: 'normal', status: 'flying', fuel: 100, angle: 0 
   };
 }
 
@@ -308,8 +313,8 @@ function draw() {
   ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   
   for (const ap of AIRPORTS) {
-    const px = ap.x * scaleX + mapShiftX;
-    const py = ap.y * scaleY + mapShiftY;
+    const px = ap.x * scaleX;
+    const py = ap.y * scaleY;
     
     ctx.fillStyle = 'rgba(0,230,118,0.2)'; ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#00e676'; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
@@ -318,14 +323,14 @@ function draw() {
   }
 
   for (const nfz of noFlyZones) {
-    const px = nfz.x * scaleX + mapShiftX, py = nfz.y * scaleY + mapShiftY, r = nfz.radius * scaleX;
+    const px = nfz.x * scaleX, py = nfz.y * scaleY, r = nfz.radius * scaleX;
     ctx.fillStyle = 'rgba(255,235,59,0.15)'; ctx.strokeStyle = 'rgba(255,235,59,0.8)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,235,59,0.9)'; ctx.font = 'bold 14px system-ui';
     ctx.fillText(nfz.name, px, py);
   }
   for (const storm of storms) {
-    const px = storm.x * scaleX + mapShiftX, py = storm.y * scaleY + mapShiftY, r = storm.radius * scaleX;
+    const px = storm.x * scaleX, py = storm.y * scaleY, r = storm.radius * scaleX;
     ctx.fillStyle = 'rgba(255,82,82,0.15)'; ctx.strokeStyle = 'rgba(255,82,82,0.7)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,82,82,0.9)'; ctx.font = 'bold 13px system-ui';
@@ -337,8 +342,8 @@ function draw() {
   for (const p of activePlanes) {
     if (p === selected) {
       ctx.strokeStyle = 'rgba(0,230,118,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
-      const startX = p.startX * scaleX + mapShiftX, startY = p.startY * scaleY + mapShiftY;
-      const endX = p.dest.x * scaleX + mapShiftX, endY = p.dest.y * scaleY + mapShiftY;
+      const startX = p.startX * scaleX, startY = p.startY * scaleY;
+      const endX = p.dest.x * scaleX, endY = p.dest.y * scaleY;
       const midX = (startX + endX) / 2, midY = (startY + endY) / 2;
       const arcOffset = Math.hypot(endX - startX, endY - startY) * 0.2;
       const angle = Math.atan2(endY - startY, endX - startX);
@@ -353,7 +358,7 @@ function draw() {
     let color = isSelected ? '#00e676' : '#ff8a65';
     if (p.fuel < 30) color = '#ff5252';
 
-    ctx.save(); ctx.translate(p.x * scaleX + mapShiftX, p.y * scaleY + mapShiftY); ctx.rotate(p.angle * Math.PI / 180);
+    ctx.save(); ctx.translate(p.x * scaleX, p.y * scaleY); ctx.rotate(p.angle * Math.PI / 180);
     ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 15;
     
     ctx.beginPath();
@@ -366,13 +371,14 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(5, -1.5); ctx.lineTo(5, 1.5); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    if (isSelected) { ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.fillText(p.id, p.x * scaleX + mapShiftX, p.y * scaleY + mapShiftY - 22); }
+    if (isSelected) { ctx.fillStyle = '#fff'; ctx.font = 'bold 13px system-ui'; ctx.fillText(p.id, p.x * scaleX, p.y * scaleY - 22); }
   }
 }
 
 function updateGame(dtReal) {
   if (gameOver || paused || !gameStarted) return;
-  const dtGame = dtReal * 2, dtSim = dtReal * 0.4;
+  const dtGame = dtReal * 2;   // ускорение таймера/спавна
+  const dtSim = dtReal;        // движение в реальном времени
 
   time += dtGame;
   
@@ -403,11 +409,14 @@ function updateGame(dtReal) {
   storms = storms.filter(s => { s.life -= dtGame; return s.life > 0; });
   noFlyZones = noFlyZones.filter(n => { n.life -= dtGame; return n.life > 0; });
 
-  const activePlanes = state.planes.filter(p => p.status === 'flying');
-  if (activePlanes.length < maxPlanes) {
+  // Спавн ДО сбора activePlanes, чтобы новые борта обновлялись в этом же кадре
+  const flyingCount = state.planes.filter(p => p.status === 'flying').length;
+  if (flyingCount < maxPlanes) {
     spawnTimer += dtGame;
     if (spawnTimer > 2) { spawnTimer = 0; state.planes.push(spawnRandomFlight()); }
   }
+
+  const activePlanes = state.planes.filter(p => p.status === 'flying');
 
   for (let i = activePlanes.length - 1; i >= 0; i--) {
     const p = activePlanes[i];
@@ -419,7 +428,8 @@ function updateGame(dtReal) {
     const dist = Math.hypot(endX - startX, endY - startY);
     
     if (dist > 0.1) {
-      p.t += (p.baseSpeed * dtSim) / dist;
+      // скорость в BASE-единицах/сек → приращение параметра t
+      p.t += (p.speed * dtSim) / dist;
       if (p.t > 1) p.t = 1;
       
       const midX = (startX + endX) / 2, midY = (startY + endY) / 2;
@@ -431,92 +441,4 @@ function updateGame(dtReal) {
       p.x = mt * mt * startX + 2 * mt * p.t * cpX + p.t * p.t * endX;
       p.y = mt * mt * startY + 2 * mt * p.t * cpY + p.t * p.t * endY;
       
-      const tx = 2 * mt * (cpX - startX) + 2 * p.t * (endX - cpX);
-      const ty = 2 * mt * (cpY - startY) + 2 * p.t * (endY - cpY);
-      p.angle = Math.atan2(ty, tx) * 180 / Math.PI;
-    }
-
-    for (const storm of storms) { if (Math.hypot(p.x - storm.x, p.y - storm.y) < storm.radius) { p.fuel -= 1.5 * dtGame; } }
-
-    let hitNFZ = false;
-    for (const nfz of noFlyZones) { if (Math.hypot(p.x - nfz.x, p.y - nfz.y) < nfz.radius) { hitNFZ = true; break; } }
-
-    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
-    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); playSound('land'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
-  }
-  state.planes = state.planes.filter(p => p.status === 'flying');
-  updateHUD();
-}
-
-function updateSelectedInfo() {
-  const infoEl = document.getElementById('actionPanel');
-  if (!selected || selected.status !== 'flying') {
-    infoEl.style.opacity = '0.5'; infoEl.style.pointerEvents = 'none';
-    document.getElementById('selId').textContent = 'Нет борта'; document.getElementById('selAir').textContent = '';
-    document.getElementById('selRoute').textContent = 'Маршрут: ---'; document.getElementById('selFuelTxt').textContent = '100%'; document.getElementById('selFuel').style.width = '100%';
-    return;
-  }
-  infoEl.style.opacity = '1'; infoEl.style.pointerEvents = 'auto';
-  document.getElementById('selId').textContent = selected.id;
-  document.getElementById('selAir').textContent = selected.airline;
-  document.getElementById('selRoute').textContent = `${selected.origin.code} → ${selected.dest.code}`;
-  document.getElementById('selFuelTxt').textContent = Math.max(0, Math.round(selected.fuel)) + '%';
-  document.getElementById('selFuel').style.width = Math.max(0, selected.fuel) + '%';
-  document.getElementById('selFuel').style.background = selected.fuel < 30 ? '#ff5252' : '#00e676';
-  document.querySelectorAll('.speed-btns button').forEach(b => b.classList.toggle('active', b.dataset.speed === selected.mode));
-}
-
-function showAirportMenu(plane, mx, my) {
-  airportMenuEl.innerHTML = '';
-  AIRPORTS.forEach(ap => {
-    const b = document.createElement('button'); b.textContent = ap.code;
-    if (ap.code === plane.dest.code) b.classList.add('current');
-    b.onclick = (e) => { 
-      e.stopPropagation(); 
-      plane.dest = ap; 
-      plane.startX = plane.x; plane.startY = plane.y; plane.t = 0; 
-      addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); 
-      playSound('click');
-    };
-    airportMenuEl.appendChild(b);
-  });
-  airportMenuEl.style.display = 'grid';
-  airportMenuEl.style.left = mx + 'px';
-  airportMenuEl.style.top = (my - 20) + 'px';
-}
-
-canvas.addEventListener('click', (e) => {
-  if (gameOver) return;
-  const rect = canvas.getBoundingClientRect(), mx = (e.clientX - rect.left) * (canvas.width / rect.width), my = (e.clientY - rect.top) * (canvas.height / rect.height);
-  const scaleX = W / BASE_W, scaleY = H / BASE_H;
-  let clicked = null;
-  state.planes.filter(p => p.status === 'flying').forEach(p => { 
-    if (Math.hypot(mx - (p.x * scaleX + mapShiftX), my - (p.y * scaleY + mapShiftY)) < 30) clicked = p; 
-  });
-  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); playSound('click'); }
-  else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
-});
-
-document.querySelectorAll('.speed-btns button').forEach(btn => {
-  btn.onclick = () => {
-    if (!selected) return;
-    selected.mode = btn.dataset.speed; selected.baseSpeed = selected.mode === 'fast' ? 0.1 : (selected.mode === 'slow' ? 0.02 : 0.05);
-    updateSelectedInfo();
-    playSound('click');
-  };
-});
-
-document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; playSound('click'); } };
-document.getElementById('resetBtn').onclick = () => { resetGame(); playSound('click'); };
-document.getElementById('playBtn').onclick = () => { initAudio(); playSound('land'); resetGame(); };
-
-let last = 0;
-function loop(ts) {
-  if (!last) last = ts; const dt = Math.min((ts - last) / 1000, 0.1); last = ts;
-  updateGame(dt); draw(); requestAnimationFrame(loop);
-}
-resetGame(); requestAnimationFrame(loop);
-</script>
-</body>
-</html>
+      const tx = 2 * mt * (cpX - startX)
