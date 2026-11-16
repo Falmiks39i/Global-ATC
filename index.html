@@ -441,4 +441,93 @@ function updateGame(dtReal) {
       p.x = mt * mt * startX + 2 * mt * p.t * cpX + p.t * p.t * endX;
       p.y = mt * mt * startY + 2 * mt * p.t * cpY + p.t * p.t * endY;
       
-      const tx = 2 * mt * (cpX - startX)
+      const tx = 2 * mt * (cpX - startX) + 2 * p.t * (endX - cpX);
+      const ty = 2 * mt * (cpY - startY) + 2 * p.t * (endY - cpY);
+      p.angle = Math.atan2(ty, tx) * 180 / Math.PI;
+    }
+
+    for (const storm of storms) { if (Math.hypot(p.x - storm.x, p.y - storm.y) < storm.radius) { p.fuel -= 1.5 * dtGame; } }
+
+    let hitNFZ = false;
+    for (const nfz of noFlyZones) { if (Math.hypot(p.x - nfz.x, p.y - nfz.y) < nfz.radius) { hitNFZ = true; break; } }
+
+    if (hitNFZ) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id}`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.fuel <= 0) { p.status = 'crashed'; state.crashes++; addLog(`КРУШЕНИЕ: ${p.id} (топливо)`, 'danger'); playSound('crash'); if (p === selected) { selected = null; updateSelectedInfo(); } if (state.crashes >= 5) gameOver = true; continue; }
+    if (p.t >= 1) { p.status = 'landed'; state.score += 100; addLog(`Посадка: ${p.id}`, 'success'); playSound('land'); if (p === selected) { selected = null; updateSelectedInfo(); } continue; }
+  }
+  state.planes = state.planes.filter(p => p.status === 'flying');
+  updateHUD();
+}
+
+function updateSelectedInfo() {
+  const infoEl = document.getElementById('actionPanel');
+  if (!selected || selected.status !== 'flying') {
+    infoEl.style.opacity = '0.5'; infoEl.style.pointerEvents = 'none';
+    document.getElementById('selId').textContent = 'Нет борта'; document.getElementById('selAir').textContent = '';
+    document.getElementById('selRoute').textContent = 'Маршрут: ---'; document.getElementById('selFuelTxt').textContent = '100%'; document.getElementById('selFuel').style.width = '100%';
+    return;
+  }
+  infoEl.style.opacity = '1'; infoEl.style.pointerEvents = 'auto';
+  document.getElementById('selId').textContent = selected.id;
+  document.getElementById('selAir').textContent = selected.airline;
+  document.getElementById('selRoute').textContent = `${selected.origin.code} → ${selected.dest.code}`;
+  document.getElementById('selFuelTxt').textContent = Math.max(0, Math.round(selected.fuel)) + '%';
+  document.getElementById('selFuel').style.width = Math.max(0, selected.fuel) + '%';
+  document.getElementById('selFuel').style.background = selected.fuel < 30 ? '#ff5252' : '#00e676';
+  document.querySelectorAll('.speed-btns button').forEach(b => b.classList.toggle('active', b.dataset.speed === selected.mode));
+}
+
+function showAirportMenu(plane, mx, my) {
+  airportMenuEl.innerHTML = '';
+  AIRPORTS.forEach(ap => {
+    const b = document.createElement('button'); b.textContent = ap.code;
+    if (ap.code === plane.dest.code) b.classList.add('current');
+    b.onclick = (e) => { 
+      e.stopPropagation(); 
+      plane.dest = ap; 
+      plane.startX = plane.x; plane.startY = plane.y; plane.t = 0; 
+      addLog(`Курс ${plane.id} на ${ap.code}`); airportMenuEl.style.display = 'none'; updateSelectedInfo(); 
+      playSound('click');
+    };
+    airportMenuEl.appendChild(b);
+  });
+  airportMenuEl.style.display = 'grid';
+  airportMenuEl.style.left = mx + 'px';
+  airportMenuEl.style.top = (my - 20) + 'px';
+}
+
+canvas.addEventListener('click', (e) => {
+  if (gameOver) return;
+  const rect = canvas.getBoundingClientRect(), mx = (e.clientX - rect.left) * (canvas.width / rect.width), my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const scaleX = W / BASE_W, scaleY = H / BASE_H;
+  let clicked = null;
+  state.planes.filter(p => p.status === 'flying').forEach(p => { 
+    if (Math.hypot(mx - p.x * scaleX, my - p.y * scaleY) < 30) clicked = p; 
+  });
+  if (clicked) { selected = clicked; updateSelectedInfo(); showAirportMenu(clicked, mx, my); playSound('click'); }
+  else { selected = null; airportMenuEl.style.display = 'none'; updateSelectedInfo(); }
+});
+
+document.querySelectorAll('.speed-btns button').forEach(btn => {
+  btn.onclick = () => {
+    if (!selected) return;
+    selected.mode = btn.dataset.speed;
+    selected.speed = SPEEDS[selected.mode];
+    updateSelectedInfo();
+    playSound('click');
+  };
+});
+
+document.getElementById('pauseBtn').onclick = () => { if (!gameOver) { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? '▶ Продолжить' : '⏸ Пауза'; if (paused) airportMenuEl.style.display = 'none'; playSound('click'); } };
+document.getElementById('resetBtn').onclick = () => { resetGame(); playSound('click'); };
+document.getElementById('playBtn').onclick = () => { initAudio(); playSound('land'); resetGame(); };
+
+let last = 0;
+function loop(ts) {
+  if (!last) last = ts; const dt = Math.min((ts - last) / 1000, 0.1); last = ts;
+  updateGame(dt); draw(); requestAnimationFrame(loop);
+}
+resetGame(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
